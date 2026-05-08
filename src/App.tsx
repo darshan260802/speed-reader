@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { FileText, Sparkles, Upload } from "lucide-react"
+import { FileText, Home, Pause, Play, RotateCcw, Sparkles, Upload } from "lucide-react"
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist"
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min?url"
 
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -40,6 +41,7 @@ async function extractTextFromPdf(buffer: ArrayBuffer) {
 }
 
 export function App() {
+  const [page, setPage] = useState<"home" | "reader">("home")
   const [doc, setDoc] = useState("")
   const [docSource, setDocSource] = useState<"paste" | "upload" | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
@@ -47,12 +49,18 @@ export function App() {
   const [isParsing, setIsParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [wpm, setWpm] = useState(300)
+  const [isPlaying, setIsPlaying] = useState(false)
 
   const sourceLabel = docSource === "paste"
     ? "Pasted text"
     : fileName
       ? `File: ${fileName}`
       : null
+
+  const readerWord = doc
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)[0] ?? "Ready"
 
   const handleUseText = () => {
     const trimmed = draftText.trim()
@@ -81,6 +89,20 @@ export function App() {
 
     const clamped = Math.min(900, Math.max(60, Math.round(value)))
     setWpm(clamped)
+  }
+
+  const handleStartReading = () => {
+    setIsPlaying(false)
+    setPage("reader")
+  }
+
+  const handleGoHome = () => {
+    setIsPlaying(false)
+    setPage("home")
+  }
+
+  const handleTogglePlay = () => {
+    setIsPlaying((prev) => !prev)
   }
 
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
@@ -126,6 +148,79 @@ export function App() {
       setIsParsing(false)
       event.target.value = ""
     }
+  }
+
+  if (page === "reader") {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="relative isolate overflow-hidden">
+          <div className="pointer-events-none absolute left-1/2 -top-48 h-104 w-104 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+          <div className="pointer-events-none absolute -left-10 top-40 h-72 w-72 rounded-full bg-secondary/70 blur-3xl" />
+
+          <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-10 sm:px-6 lg:px-8">
+            <section className="space-y-2">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+                Reader
+              </div>
+              <h1 className="font-heading text-3xl sm:text-4xl">
+                Reader
+              </h1>
+              <p className="text-sm text-muted-foreground sm:text-base">
+                Focus on the word between the guides.
+              </p>
+            </section>
+
+            <Card className="mx-auto w-full max-w-3xl">
+              <CardContent className="space-y-6 pt-6">
+                <div className="relative">
+                  <Separator />
+                  <Separator
+                    orientation="vertical"
+                    className="absolute bottom-0 left-2/5 h-6"
+                  />
+                </div>
+                <div className="text-center font-heading text-3xl sm:text-4xl">
+                  {readerWord}
+                </div>
+                <div className="relative">
+                  <Separator />
+                  <Separator
+                    orientation="vertical"
+                    className="absolute left-2/5 top-0 h-6"
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
+                <Button className="w-full sm:w-auto" onClick={handleTogglePlay}>
+                  {isPlaying ? (
+                    <Pause className="mr-2 size-4" />
+                  ) : (
+                    <Play className="mr-2 size-4" />
+                  )}
+                  {isPlaying ? "Pause" : "Play"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  onClick={() => setIsPlaying(false)}
+                >
+                  <RotateCcw className="mr-2 size-4" />
+                  Restart
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={handleGoHome}
+                >
+                  <Home className="mr-2 size-4" />
+                  Go home
+                </Button>
+              </CardFooter>
+            </Card>
+          </main>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -289,6 +384,7 @@ export function App() {
                 <Button
                   className="w-full sm:w-auto"
                   disabled={!doc || isParsing}
+                  onClick={handleStartReading}
                 >
                   Start reading
                 </Button>
