@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { FileText, Home, Pause, Play, RotateCcw, Sparkles, Upload } from "lucide-react"
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist"
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min?url"
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
@@ -50,6 +51,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [wpm, setWpm] = useState(300)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [currentWordIndex, setCurrentWordIndex] = useState(0)
 
   const sourceLabel = docSource === "paste"
     ? "Pasted text"
@@ -57,10 +59,13 @@ export function App() {
       ? `File: ${fileName}`
       : null
 
-  const readerWord = doc
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)[0] ?? "Ready"
+  const words = doc.trim().split(/\s+/).filter(Boolean)
+  const totalWords = words.length
+  const safeWordIndex = Math.min(currentWordIndex, Math.max(totalWords - 1, 0))
+  const currentWord = totalWords > 0 ? words[safeWordIndex] : "Ready"
+  const progressPercent = totalWords > 0
+    ? Math.round(((safeWordIndex + 1) / totalWords) * 100)
+    : 0
 
   const handleUseText = () => {
     const trimmed = draftText.trim()
@@ -93,6 +98,7 @@ export function App() {
 
   const handleStartReading = () => {
     setIsPlaying(false)
+    setCurrentWordIndex(0)
     setPage("reader")
   }
 
@@ -102,7 +108,16 @@ export function App() {
   }
 
   const handleTogglePlay = () => {
+    if (totalWords === 0) {
+      return
+    }
+
     setIsPlaying((prev) => !prev)
+  }
+
+  const handleRestart = () => {
+    setIsPlaying(false)
+    setCurrentWordIndex(0)
   }
 
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
@@ -150,6 +165,38 @@ export function App() {
     }
   }
 
+  useEffect(() => {
+    setCurrentWordIndex(0)
+    setIsPlaying(false)
+  }, [doc])
+
+  useEffect(() => {
+    if (!isPlaying || totalWords === 0) {
+      return
+    }
+
+    const intervalMs = Math.max(50, Math.round(60000 / wpm))
+    const timer = window.setInterval(() => {
+      setCurrentWordIndex((prev) => {
+        if (prev >= totalWords - 1) {
+          return prev
+        }
+
+        return prev + 1
+      })
+    }, intervalMs)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [isPlaying, totalWords, wpm])
+
+  useEffect(() => {
+    if (isPlaying && totalWords > 0 && currentWordIndex >= totalWords - 1) {
+      setIsPlaying(false)
+    }
+  }, [currentWordIndex, isPlaying, totalWords])
+
   if (page === "reader") {
     return (
       <div className="min-h-screen bg-background text-foreground">
@@ -157,21 +204,17 @@ export function App() {
           <div className="pointer-events-none absolute left-1/2 -top-48 h-104 w-104 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
           <div className="pointer-events-none absolute -left-10 top-40 h-72 w-72 rounded-full bg-secondary/70 blur-3xl" />
 
-          <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-            <section className="space-y-2">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                Reader
+          <main className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col pt-10">
+            <section className="space-y-3 px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Progress: {progressPercent}%</span>
+                <span>WPM: {wpm}</span>
               </div>
-              <h1 className="font-heading text-3xl sm:text-4xl">
-                Reader
-              </h1>
-              <p className="text-sm text-muted-foreground sm:text-base">
-                Focus on the word between the guides.
-              </p>
+              <Progress value={progressPercent} />
             </section>
 
-            <Card className="mx-auto w-full max-w-3xl">
-              <CardContent className="space-y-6 pt-6">
+            <section className="flex flex-1 items-center justify-center py-8">
+              <div className="w-full max-w-3xl space-y-6">
                 <div className="relative">
                   <Separator />
                   <Separator
@@ -179,8 +222,8 @@ export function App() {
                     className="absolute bottom-0 left-2/5 h-6"
                   />
                 </div>
-                <div className="text-center font-heading text-3xl sm:text-4xl">
-                  {readerWord}
+                <div className="text-center font-heading text-4xl sm:text-5xl">
+                  {currentWord}
                 </div>
                 <div className="relative">
                   <Separator />
@@ -189,9 +232,16 @@ export function App() {
                     className="absolute left-2/5 top-0 h-6"
                   />
                 </div>
-              </CardContent>
-              <CardFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
-                <Button className="w-full sm:w-auto" onClick={handleTogglePlay}>
+              </div>
+            </section>
+
+            <Card className="mt-auto rounded-t-3xl rounded-b-none border-b-0 bg-card/95 backdrop-blur">
+              <CardContent className="grid gap-3 pt-6">
+                <Button
+                  className="w-full"
+                  onClick={handleTogglePlay}
+                  disabled={totalWords === 0}
+                >
                   {isPlaying ? (
                     <Pause className="mr-2 size-4" />
                   ) : (
@@ -201,21 +251,22 @@ export function App() {
                 </Button>
                 <Button
                   variant="secondary"
-                  className="w-full sm:w-auto"
-                  onClick={() => setIsPlaying(false)}
+                  className="w-full"
+                  onClick={handleRestart}
+                  disabled={totalWords === 0}
                 >
                   <RotateCcw className="mr-2 size-4" />
                   Restart
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full sm:w-auto"
+                  className="w-full"
                   onClick={handleGoHome}
                 >
                   <Home className="mr-2 size-4" />
-                  Go home
+                  Home
                 </Button>
-              </CardFooter>
+              </CardContent>
             </Card>
           </main>
         </div>
