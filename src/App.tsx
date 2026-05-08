@@ -56,6 +56,19 @@ function getWordDelayMs(word: string, baseMs: number) {
   return Math.max(50, Math.round(baseMs * multiplier))
 }
 
+function splitWordForHighlight(word: string) {
+  if (!word) {
+    return { leading: "", pivot: "", trailing: "" }
+  }
+
+  const pivotIndex = Math.floor((word.length - 1) / 2)
+  return {
+    leading: word.slice(0, pivotIndex),
+    pivot: word.slice(pivotIndex, pivotIndex + 1),
+    trailing: word.slice(pivotIndex + 1),
+  }
+}
+
 export function App() {
   const [page, setPage] = useState<"home" | "reader">("home")
   const [doc, setDoc] = useState("")
@@ -78,6 +91,7 @@ export function App() {
   const totalWords = words.length
   const safeWordIndex = Math.min(currentWordIndex, Math.max(totalWords - 1, 0))
   const currentWord = totalWords > 0 ? words[safeWordIndex] : "Ready"
+  const wordSegments = splitWordForHighlight(currentWord)
   const progressPercent = totalWords > 0
     ? Math.round(((safeWordIndex + 1) / totalWords) * 100)
     : 0
@@ -235,17 +249,21 @@ export function App() {
                   <Separator />
                   <Separator
                     orientation="vertical"
-                    className="absolute bottom-0 left-2/5 h-6"
+                    className="absolute bottom-0 left-1/2 h-6 -translate-x-11"
                   />
                 </div>
-                <div className="text-center font-heading text-4xl sm:text-5xl">
-                  {currentWord}
+                <div className="text-center font-heading text-4xl sm:text-5xl flex justify-center items-center">
+                  <div className="relative flex -left-10">
+                    <span className="absolute left-0 -translate-x-full" >{wordSegments.leading}</span>
+                    <span className="text-red-500">{wordSegments.pivot}</span>
+                    <span className="absolute left-full" >{wordSegments.trailing}</span>
+                  </div>
                 </div>
                 <div className="relative">
                   <Separator />
                   <Separator
                     orientation="vertical"
-                    className="absolute left-2/5 top-0 h-6"
+                    className="absolute left-1/2 top-0 h-6 -translate-x-11"
                   />
                 </div>
               </div>
