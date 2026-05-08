@@ -41,6 +41,21 @@ async function extractTextFromPdf(buffer: ArrayBuffer) {
   return pageTexts.join("\n\n").trim()
 }
 
+const PUNCTUATION_PAUSES: Record<string, number> = {
+  ",": 1.3,
+  ".": 1.7,
+  "?": 1.8,
+}
+
+const TRAILING_CLOSERS = /[)\]}'"]+$/g
+
+function getWordDelayMs(word: string, baseMs: number) {
+  const cleaned = word.replace(TRAILING_CLOSERS, "")
+  const lastChar = cleaned.slice(-1)
+  const multiplier = PUNCTUATION_PAUSES[lastChar] ?? 1
+  return Math.max(50, Math.round(baseMs * multiplier))
+}
+
 export function App() {
   const [page, setPage] = useState<"home" | "reader">("home")
   const [doc, setDoc] = useState("")
@@ -171,12 +186,13 @@ export function App() {
   }, [doc])
 
   useEffect(() => {
-    if (!isPlaying || totalWords === 0) {
+    if (!isPlaying || totalWords === 0 || currentWordIndex >= totalWords - 1) {
       return
     }
 
-    const intervalMs = Math.max(50, Math.round(60000 / wpm))
-    const timer = window.setInterval(() => {
+    const baseMs = Math.max(50, Math.round(60000 / wpm))
+    const delayMs = getWordDelayMs(currentWord, baseMs)
+    const timer = window.setTimeout(() => {
       setCurrentWordIndex((prev) => {
         if (prev >= totalWords - 1) {
           return prev
@@ -184,12 +200,12 @@ export function App() {
 
         return prev + 1
       })
-    }, intervalMs)
+    }, delayMs)
 
     return () => {
-      window.clearInterval(timer)
+      window.clearTimeout(timer)
     }
-  }, [isPlaying, totalWords, wpm])
+  }, [currentWord, currentWordIndex, isPlaying, totalWords, wpm])
 
   useEffect(() => {
     if (isPlaying && totalWords > 0 && currentWordIndex >= totalWords - 1) {
