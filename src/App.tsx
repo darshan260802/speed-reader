@@ -215,7 +215,7 @@ export function App() {
 
   if (page === "reader") {
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="max-h-screen h-screen bg-background text-foreground">
         <div className="relative isolate overflow-hidden">
           <div className="pointer-events-none absolute left-1/2 -top-48 h-104 w-104 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
           <div className="pointer-events-none absolute -left-10 top-40 h-72 w-72 rounded-full bg-secondary/70 blur-3xl" />
