@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { FileText, Sparkles, Upload } from "lucide-react"
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist"
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min?url"
@@ -8,11 +8,13 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 
 GlobalWorkerOptions.workerSrc = pdfWorker
@@ -44,30 +46,13 @@ export function App() {
   const [draftText, setDraftText] = useState("")
   const [isParsing, setIsParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const docStats = useMemo(() => {
-    const trimmed = doc.trim()
-    if (!trimmed) {
-      return { words: 0, chars: 0 }
-    }
-
-    return {
-      words: trimmed.split(/\s+/).length,
-      chars: doc.length,
-    }
-  }, [doc])
+  const [wpm, setWpm] = useState(300)
 
   const sourceLabel = docSource === "paste"
     ? "Pasted text"
     : fileName
       ? `File: ${fileName}`
       : null
-
-  const docSummary = doc
-    ? `${docStats.words} words \u2022 ${docStats.chars} chars${
-        sourceLabel ? ` \u2022 ${sourceLabel}` : ""
-      }`
-    : "Paste text or upload a file to begin."
 
   const handleUseText = () => {
     const trimmed = draftText.trim()
@@ -84,6 +69,18 @@ export function App() {
 
   const handleClearDraft = () => {
     setDraftText("")
+  }
+
+  const handleWpmInputChange: React.ChangeEventHandler<HTMLInputElement> = (
+    event
+  ) => {
+    const value = Number(event.target.value)
+    if (!Number.isFinite(value)) {
+      return
+    }
+
+    const clamped = Math.min(900, Math.max(60, Math.round(value)))
+    setWpm(clamped)
   }
 
   const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
@@ -129,14 +126,6 @@ export function App() {
       setIsParsing(false)
       event.target.value = ""
     }
-  }
-
-  const handleClearAll = () => {
-    setDoc("")
-    setDocSource(null)
-    setFileName(null)
-    setDraftText("")
-    setError(null)
   }
 
   return (
@@ -234,47 +223,76 @@ export function App() {
             </Card>
 
             <Card className="lg:col-span-2">
-              <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <CardTitle>Document preview</CardTitle>
-                  <CardDescription>{docSummary}</CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClearAll}
-                  disabled={
-                    !doc &&
-                    !draftText &&
-                    !fileName &&
-                    !error &&
-                    !isParsing
-                  }
-                >
-                  Clear all
-                </Button>
+              <CardHeader>
+                <CardTitle>Reading speed</CardTitle>
+                <CardDescription>
+                  Set your target words per minute before you start.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 {error ? (
                   <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {error}
                   </div>
                 ) : null}
-                {isParsing ? (
-                  <div className="rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                    Reading your document...
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Words per minute</span>
+                  <span className="font-medium text-foreground">{wpm} WPM</span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <Slider
+                    value={[wpm]}
+                    min={60}
+                    max={900}
+                    step={10}
+                    onValueChange={(value) => setWpm(value[0] ?? 60)}
+                    disabled={isParsing}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="wpm-input" className="sr-only">
+                      WPM
+                    </Label>
+                    <Input
+                      id="wpm-input"
+                      type="number"
+                      min={60}
+                      max={900}
+                      value={wpm}
+                      onChange={handleWpmInputChange}
+                      className="w-24"
+                      disabled={isParsing}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <span>Range: 60-900 WPM.</span>
+                  <span>
+                    {isParsing
+                      ? "Reading your document..."
+                      : doc
+                        ? "Document ready."
+                        : "No document loaded yet."}
+                  </span>
+                </div>
+                {sourceLabel ? (
+                  <div className="text-xs text-muted-foreground">
+                    Source: {sourceLabel}
                   </div>
                 ) : null}
-                {doc ? (
-                  <div className="max-h-80 overflow-auto rounded-xl border bg-card/60 px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-                    {doc}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                    No document loaded yet.
-                  </div>
-                )}
               </CardContent>
+              <CardFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {doc
+                    ? "Ready to read when you are."
+                    : "Load a document to enable reading."}
+                </span>
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={!doc || isParsing}
+                >
+                  Start reading
+                </Button>
+              </CardFooter>
             </Card>
           </section>
         </main>
